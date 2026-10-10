@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-apk
+  cancel-in-progress: false
+
 env:
   APP_NAME: eKhata
   APP_ID: com.ekhata.app
@@ -16,7 +20,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
 
     steps:
@@ -60,9 +64,8 @@ jobs:
 
           cat > www/native-bridge.js <<'EOF'
           (function () {
-            var C = window.Capacitor;
-            if (!(C && C.isNativePlatform && C.isNativePlatform())) return;
-            var P = C.Plugins || {};
+            // plugins are looked up when used (Capacitor may not be ready at script load)
+            function PL() { return (window.Capacitor && window.Capacitor.Plugins) || {}; }
 
             function b64(blob) {
               return new Promise(function (res, rej) {
@@ -78,8 +81,8 @@ jobs:
             }
             async function saveShare(blob, name) {
               var data = await b64(blob);
-              var w = await P.Filesystem.writeFile({ path: safe(name), data: data, directory: 'CACHE' });
-              await P.Share.share({ title: name, url: w.uri, dialogTitle: name });
+              var w = await PL().Filesystem.writeFile({ path: safe(name), data: data, directory: 'CACHE' });
+              await PL().Share.share({ title: name, url: w.uri, dialogTitle: name });
             }
             function toastMsg(m) { try { if (window.toast) window.toast(m); } catch (e) {} }
 
@@ -121,7 +124,7 @@ jobs:
                 if (d.files && d.files.length) {
                   p = saveShare(d.files[0], d.files[0].name || d.title || 'file');
                 } else {
-                  p = P.Share.share({ title: d.title || '', text: d.text || '', url: d.url || '', dialogTitle: d.title || '' });
+                  p = PL().Share.share({ title: d.title || '', text: d.text || '', url: d.url || '', dialogTitle: d.title || '' });
                 }
                 return p.catch(function (e) {
                   if (e && /cancel/i.test(String(e.message || e))) throw abort();
@@ -170,7 +173,8 @@ jobs:
             "appName": "$APP_NAME",
             "webDir": "www",
             "backgroundColor": "#0f6e56",
-            "server": { "androidScheme": "https" }
+            "server": { "androidScheme": "https" },
+            "android": { "adjustMarginsForEdgeToEdge": "auto" }
           }
           EOF
 
@@ -243,8 +247,9 @@ jobs:
           EOF
           sed -i "s/__PKG__/$APP_ID/" "$PKGDIR/MainActivity.java"
 
-          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
-          sed -i "s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]*\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -nE "versionCode|versionName" android/app/build.gradle
 
           npx cap sync android
 
@@ -263,7 +268,9 @@ jobs:
           "$BT/apksigner" sign --ks signing/ekhata.keystore --ks-key-alias "$KS_ALIAS" \
             --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" --out "$OUT" aligned.apk
           "$BT/apksigner" verify "$OUT"
+          ls -lh "$OUT"
           echo "APK_FILE=$OUT" >> "$GITHUB_ENV"
+          echo "### $OUT  ($(du -h "$OUT" | cut -f1))" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
