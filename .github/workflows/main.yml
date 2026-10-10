@@ -1,0 +1,278 @@
+name: Build eKhata APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: eKhata
+  APP_ID: com.ekhata.app
+  KS_PASS: ekhata-keystore-pass
+  KS_ALIAS: ekhata
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Check index.html
+        run: |
+          test -f index.html || { echo "::error::index.html repo को root मा छैन"; exit 1; }
+
+      # एउटै स्थिर signing key राख्ने (नत्र अपडेट गर्दा "App not installed" आउँछ र डाटा हराउँछ)
+      - name: Signing key (create once, reuse after)
+        run: |
+          if [ ! -f signing/ekhata.keystore ]; then
+            mkdir -p signing
+            keytool -genkeypair -v -keystore signing/ekhata.keystore -alias "$KS_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 36500 \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=$APP_NAME"
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add signing/ekhata.keystore
+            git commit -m "Add signing key (auto-generated)"
+            git push
+          fi
+
+      - name: Prepare web files
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+
+          cat > www/native-bridge.js <<'EOF'
+          (function () {
+            var C = window.Capacitor;
+            if (!(C && C.isNativePlatform && C.isNativePlatform())) return;
+            var P = C.Plugins || {};
+
+            function b64(blob) {
+              return new Promise(function (res, rej) {
+                var r = new FileReader();
+                r.onload = function () { res(String(r.result).split(',')[1] || ''); };
+                r.onerror = rej;
+                r.readAsDataURL(blob);
+              });
+            }
+            function safe(n) {
+              n = String(n || '').replace(/[^\w.\-]+/g, '_');
+              return /[A-Za-z0-9]/.test(n) ? n : 'file_' + Date.now();
+            }
+            async function saveShare(blob, name) {
+              var data = await b64(blob);
+              var w = await P.Filesystem.writeFile({ path: safe(name), data: data, directory: 'CACHE' });
+              await P.Share.share({ title: name, url: w.uri, dialogTitle: name });
+            }
+            function toastMsg(m) { try { if (window.toast) window.toast(m); } catch (e) {} }
+
+            // <a download href="blob:..."> -> Android share sheet (Drive / Files / WhatsApp)
+            function handle(a) {
+              var h = (a.getAttribute && a.getAttribute('href')) || a.href || '';
+              if (!a.hasAttribute || !a.hasAttribute('download')) return false;
+              if (h.indexOf('blob:') !== 0 && h.indexOf('data:') !== 0) return false;
+              var name = a.getAttribute('download') || 'file';
+              fetch(h).then(function (r) { return r.blob(); })
+                .then(function (b) { return saveShare(b, name); })
+                .catch(function (e) {
+                  if (e && /cancel/i.test(String(e.message || e))) return;
+                  toastMsg('फाइल सेभ गर्न सकिएन');
+                });
+              return true;
+            }
+            var oc = HTMLAnchorElement.prototype.click;
+            HTMLAnchorElement.prototype.click = function () {
+              if (handle(this)) return;
+              oc.call(this);
+            };
+            document.addEventListener('click', function (e) {
+              var a = e.target && e.target.closest ? e.target.closest('a[download]') : null;
+              if (a && handle(a)) { e.preventDefault(); e.stopPropagation(); }
+            }, true);
+
+            // navigator.share / canShare
+            function abort() {
+              try { return new DOMException('Share canceled', 'AbortError'); }
+              catch (e) { var x = new Error('Share canceled'); x.name = 'AbortError'; return x; }
+            }
+            Object.defineProperty(navigator, 'canShare', { value: function () { return true; }, configurable: true });
+            Object.defineProperty(navigator, 'share', {
+              configurable: true,
+              value: function (d) {
+                d = d || {};
+                var p;
+                if (d.files && d.files.length) {
+                  p = saveShare(d.files[0], d.files[0].name || d.title || 'file');
+                } else {
+                  p = P.Share.share({ title: d.title || '', text: d.text || '', url: d.url || '', dialogTitle: d.title || '' });
+                }
+                return p.catch(function (e) {
+                  if (e && /cancel/i.test(String(e.message || e))) throw abort();
+                  throw e;
+                });
+              }
+            });
+
+            // window.print -> Android print dialog (Save as PDF सम्भव)
+            window.print = function () {
+              if (window.AndroidPrint) window.AndroidPrint.print(document.title || 'eKhata');
+            };
+          })();
+          EOF
+
+          python3 - <<'PY'
+          import re
+          s = open('www/index.html', encoding='utf-8').read()
+          tag = '<script src="native-bridge.js"></script>'
+          if tag not in s:
+              s = re.sub(r'<head>', '<head>' + tag, s, count=1, flags=re.I)
+          open('www/index.html', 'w', encoding='utf-8').write(s)
+          PY
+
+      - name: Create Capacitor project
+        run: |
+          cat > package.json <<EOF
+          {
+            "name": "ekhata",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/android": "^7.0.0",
+              "@capacitor/cli": "^7.0.0",
+              "@capacitor/core": "^7.0.0",
+              "@capacitor/filesystem": "^7.0.0",
+              "@capacitor/share": "^7.0.0"
+            }
+          }
+          EOF
+
+          cat > capacitor.config.json <<EOF
+          {
+            "appId": "$APP_ID",
+            "appName": "$APP_NAME",
+            "webDir": "www",
+            "backgroundColor": "#0f6e56",
+            "server": { "androidScheme": "https" }
+          }
+          EOF
+
+          npm install
+          npx cap add android
+
+      - name: Generate app icon
+        continue-on-error: true
+        run: |
+          pip install pillow
+          mkdir -p assets
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+          GREEN = (15, 110, 86, 255)
+
+          def glass(size, scale, bg):
+              im = Image.new('RGBA', (size, size), bg)
+              d = ImageDraw.Draw(im)
+              s = size * scale / 1024.0
+              cx, cy = size / 2, size / 2
+              def P(x, y): return (cx + (x - 512) * s, cy + (y - 512) * s)
+              d.polygon([P(300, 250), P(724, 250), P(676, 800), P(348, 800)], fill=(226, 242, 237, 255))
+              d.polygon([P(318, 400), P(706, 400), P(668, 780), P(356, 780)], fill=(255, 255, 255, 255))
+              d.polygon([P(300, 250), P(724, 250), P(720, 290), P(304, 290)], fill=(200, 226, 218, 255))
+              return im
+
+          glass(1024, 1.0, GREEN).save('assets/icon-only.png')
+          glass(1024, 0.62, (0, 0, 0, 0)).save('assets/icon-foreground.png')
+          Image.new('RGBA', (1024, 1024), GREEN).save('assets/icon-background.png')
+          sp = glass(2732, 0.35, GREEN)
+          sp.save('assets/splash.png')
+          sp.save('assets/splash-dark.png')
+          PY
+          npx --yes @capacitor/assets@3 generate --android
+
+      - name: Patch Android (version, print bridge)
+        run: |
+          PKGDIR="android/app/src/main/java/${APP_ID//.//}"
+          mkdir -p "$PKGDIR"
+          cat > "$PKGDIR/MainActivity.java" <<'EOF'
+          package __PKG__;
+
+          import android.os.Bundle;
+          import android.print.PrintAttributes;
+          import android.print.PrintDocumentAdapter;
+          import android.print.PrintManager;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.WebView;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              final WebView wv = getBridge().getWebView();
+              wv.addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public void print(final String title) {
+                  runOnUiThread(new Runnable() {
+                    public void run() {
+                      PrintManager pm = (PrintManager) getSystemService(PRINT_SERVICE);
+                      PrintDocumentAdapter a = wv.createPrintDocumentAdapter(title);
+                      pm.print(title, a, new PrintAttributes.Builder().build());
+                    }
+                  });
+                }
+              }, "AndroidPrint");
+            }
+          }
+          EOF
+          sed -i "s/__PKG__/$APP_ID/" "$PKGDIR/MainActivity.java"
+
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+
+          npx cap sync android
+
+      - name: Build release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Align and sign APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          UNSIGNED=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          OUT="eKhata-v${{ github.run_number }}.apk"
+          "$BT/zipalign" -p -f 4 "$UNSIGNED" aligned.apk
+          "$BT/apksigner" sign --ks signing/ekhata.keystore --ks-alias "$KS_ALIAS" \
+            --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" --out "$OUT" aligned.apk
+          "$BT/apksigner" verify "$OUT"
+          echo "APK_FILE=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eKhata-apk
+          path: ${{ env.APK_FILE }}
+
+      - name: Publish release (direct APK download)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: eKhata v${{ github.run_number }}
+          files: ${{ env.APK_FILE }}
