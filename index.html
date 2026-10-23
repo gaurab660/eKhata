@@ -6643,6 +6643,7 @@ window.csDues=function(mk){try{if(mk&&S.sc!=mk&&typeof mkFree==='function'&&mkFr
 /* Report: हब (List) → प्रत्येक खण्डको छुट्टै पृष्ठ */
 const csSub=()=>{let neg=0;mkts().forEach(m=>{const b=acct(m.id).bal;if(b<0)neg+=-b});return neg?'Dr मौज्दात रु '+m2(neg)+' बाँकी':'दैनिक Cash मिलान · विक्रेता Ledger'};
 function rpSecs(){const X=rpData(),d=X.d,L=[],add=(k,t,ic,h,v,html,dt)=>{if(html)L.push({k,t,ic,h,v,html,dt})};
+ add('sum','दिनको सारांश','file',210,'रु '+n2(X.ts)+' · '+X.dn.length+' / '+X.ok.length+' Delivery',X.sum,1);
  add('itm','वस्तुअनुसार Order','tag',30,X.IT.length+' प्रकार',X.itm,1);
  add('stk','सामान र Stock मिलान','grid',270,'',stkRepV(d),1);
  if(viewOk())L.push({k:'cs',t:'Cash मिलान र Ledger',ic:'store',h:150,v:csSub()});
@@ -6661,7 +6662,7 @@ window.repV=function(){
  if(S.sub&&String(S.sub).slice(0,3)==='rp_'){const x=L.find(y=>'rp_'+y.k===S.sub);if(x)return rpPage(x);S.sub=null}
  return'<h2>Report</h2>'+bar()+L.map(rpRow).join('')};
 /* ===== Report v2: दुई तहको हब — हरेक कुराको छुट्टै पृष्ठ ===== */
-const RPG=[['दैनिक कारोबार',['itm','irp','stk']],['Customer र Cash',['crp','cs']],['Analysis',['prf','mon']],['Close र जाँच',['cls','chk']]];
+const RPG=[['दैनिक कारोबार',['sum','itm','irp','stk']],['Customer र Cash',['crp','cs']],['Analysis',['prf','mon']],['Close र जाँच',['cls','chk']]];
 function monParts(){const ym=S.rm=ymOk(S.rm&&typeof S.rm=='string'?S.rm:ymOf(S.day||today())),L=D.ent.filter(e=>isCompleted(e)&&inYM(e.date,ym)),it={},cu={};
  L.forEach(e=>{e.lines.forEach(l=>{const o=it[l.n]||(it[l.n]={q:0,a:0});o.q=roundMoney(o.q+l.q);o.a=addMoney(o.a,l.q*l.r)});(e.rets||[]).forEach(r=>{const o=it[r.n]||(it[r.n]={q:0,a:0});o.q=roundMoney(o.q-r.q);o.a=addMoney(o.a,-(r.q*r.r))});cu[e.cid]=addMoney(cu[e.cid]||0,billTotal(e))});
  const top=Object.entries(cu).sort((a,b)=>b[1]-a[1]).slice(0,5),MS=sumBillTotals(L),MR=sumReceived(L),MN=subtractMoney(MS,MR),ITm=Object.entries(it).sort((a,b)=>b[1].a-a[1].a),nc=new Set(L.map(e=>e.cid)).size,nd=new Set(L.map(e=>e.date)).size;
@@ -6931,8 +6932,8 @@ function calc(d,mk){const c=C(),R={},P={},M=CMK(),mo={};M.cust.forEach(x=>mo[x.i
   pack(z.q,z.f).forEach(([t,n])=>{const r=R[t]=R[t]||{n:0,cu:{}},u=r.cu[cid]=r.cu[cid]||{n:0,x:[]};r.n+=n;u.n+=n;u.x.push(tx)})}));
  return R}
 function bal(cid,t){return C().mv.filter(m=>m.c==cid&&m.t==t).reduce((s,m)=>s+(m.k=='in'?-m.q:m.q),0)}
-const S_=()=>S.cr=S.cr||{tab:'c',d:TD(),q:''};
-const tabs=()=>{const s=S_();return'<div class="row" style="gap:6px;margin:8px 0">'+[['c','गणना'],['l','लोड जाँच'],['b','बाँकी']].concat(roleKind()=='mgmt'?[['s','सेटअप']]:[]).map(x=>'<button class="b '+(s.tab==x[0]?'':'g')+'" style="flex:1;padding:10px 4px" onclick="S.cr.tab=\''+x[0]+'\';render()">'+x[1]+'</button>').join('')+'</div>'};
+const S_=()=>S.cr=S.cr||{tab:roleKind()=='field'?'p':'c',d:TD(),q:''};
+const tabs=()=>{const s=S_();return'<div class="row" style="gap:6px;margin:8px 0">'+(roleKind()=='field'?[['p','लोड योजना'],['c','ग्राहकअनुसार'],['b','बाँकी']]:[['c','गणना'],['l','लोड जाँच'],['b','बाँकी']].concat(roleKind()=='mgmt'?[['s','सेटअप']]:[])).map(x=>'<button class="b '+(s.tab==x[0]?'':'g')+'" style="flex:1;padding:10px 4px" onclick="S.cr.tab=\''+x[0]+'\';render()">'+x[1]+'</button>').join('')+'</div>'};
 function cV(){const s=S_(),R=calc(s.d);let h='<div class="row"><input type="date" value="'+H(s.d)+'" onchange="S.cr.d=this.value;render()" style="flex:1"></div>';
  const ks=Object.keys(R);if(!ks.length)return h+'<div class="card s" style="text-align:center;padding:18px">यो मितिको Order मा क्रेट/जाली/ड्रम चाहिने वस्तु छैन। (वस्तु सेटअप हेर्नुहोस्)</div>';
  ks.forEach(t=>{const r=R[t];h+='<div class="sum"><div class="row"><b style="font-size:17px">'+H(TN(t))+'</b><b class="ok" style="font-size:24px">'+r.n+'</b></div>'+Object.keys(r.cu).map(cid=>'<div class="row s" style="padding:5px 0;border-top:1px solid var(--b)"><span style="flex:1;min-width:0">'+H(cn(cid))+'<br>'+H(r.cu[cid].x.join(' · '))+'</span><b style="font-size:16px">'+r.cu[cid].n+'</b></div>').join('')+'</div>'});
@@ -6954,14 +6955,14 @@ function sV(){const c=C(),F=(id,f,l,v)=>'<label class="s" style="display:flex;al
  '<div class="sec">प्रकारको नाम</div>'+c.types.map(t=>'<div class="card"><input value="'+H(t.n)+'" onchange="crName(\''+t.id+'\',this.value)"></div>').join('')}
 window.crMap=function(id,f,v){const c=C();if(f=='t'){if(!v)delete c.map[id];else{const g=guess(D.items.find(x=>x.id==id)||{});c.map[id]=g&&g.t==v?g:{t:v,p:(c.map[id]||{}).p||12,m:1}}}else if(c.map[id]){c.map[id][f]=f=='p'?Math.max(1,Math.floor(+v)||1):Math.max(0,Math.floor(+v)||0)}save();render()};
 window.crName=function(id,v){const t=C().types.find(x=>x.id==id);if(t&&v.trim()){t.n=v.trim();save()}};
-function lV(){const s=S_(),c=C(),M=CMK(),mks=M.mkts||[],mk=s.mk!==undefined?s.mk:(S.sc||(typeof dspMk==='function'?dspMk():'')),R=calc(s.d,mk),key=s.d+'|'+mk,L=(c.ld=c.ld||{})[key]||{l:{},r:{}};
+function lV(){const s=S_(),c=C(),M=CMK(),mks=M.mkts||[],mk=s.mk!==undefined?s.mk:(S.sc||(typeof dspMk==='function'?dspMk():'')),R=calc(s.d,mk),key=s.d+'|'+mk,L=(c.ld=c.ld||{})[key]||{l:{},r:{}},PL=(c.plan||{})[key],E=PL&&PL.ok?plLoad(plRows(s.d,mk)).res:null;
  let h='<div class="row" style="gap:6px"><input type="date" value="'+H(s.d)+'" onchange="S.cr.d=this.value;render()" style="flex:1">'+(mks.length>1&&!S.sc?'<select style="flex:1;padding:10px" onchange="S.cr.mk=this.value;render()">'+mks.map(m=>'<option value="'+m.id+'"'+(m.id==mk?' selected':'')+'>'+H(m.name)+'</option>').join('')+'</select>':'')+'</div>';
- const ord=typeof dpOrd==='function'?dpOrd(s.d,mk):{},dis={},B=typeof dspAll==='function'?(dspAll(s.d)[mk]||[]):[];B.forEach(b=>Object.keys(b.q||{}).forEach(i=>dis[i]=(dis[i]||0)+(+b.q[i]||0)));
+ const ord=E?plQ(s.d,mk):(typeof dpOrd==='function'?dpOrd(s.d,mk):{}),dis={},B=typeof dspAll==='function'?(dspAll(s.d)[mk]||[]):[];B.forEach(b=>Object.keys(b.q||{}).forEach(i=>dis[i]=(dis[i]||0)+(+b.q[i]||0)));
  const bad=Object.keys(c.map).filter(i=>(+ord[i]||0)!=(+dis[i]||0)).map(i=>{const it=D.items.find(x=>x.id==i)||{name:i};return'<div class="row s"><span style="flex:1">'+inm(it)+'</span><span>Order '+(ord[i]||0)+' · Dispatch '+(dis[i]||0)+'</span></div>'});
  h+=B.length?(bad.length?'<div class="warn"><b>Dispatch र Order मिलेन</b> — क्रेट गणना Order अनुसार हो; पहिले Dispatch सच्याउनुहोस्:'+bad.join('')+'</div>':'<div class="card s">✓ क्रेट/जाली चाहिने वस्तुको Dispatch र Order मिल्यो।</div>'):'<div class="warn">यस बजारको Dispatch अहिलेसम्म भरिएको छैन।</div>';
- const ts=c.types.filter(t=>R[t.id]||L.l[t.id]!=null||L.r[t.id]!=null);if(!ts.length)return h+'<div class="card s" style="text-align:center;padding:18px">यस मिति/बजारमा क्रेट/जाली चाहिने वस्तु छैन।</div>';
+ const ts=c.types.filter(t=>(E?E[t.id]:R[t.id])||L.l[t.id]!=null||L.r[t.id]!=null);if(!ts.length)return h+'<div class="card s" style="text-align:center;padding:18px">यस मिति/बजारमा क्रेट/जाली चाहिने वस्तु छैन।</div>';
  const I=(t,f,v)=>'<input inputmode="numeric" style="width:72px;text-align:center;padding:9px 2px" value="'+(v==null?'':v)+'" onchange="crLd(\''+H(key)+'\',\''+t+'\',\''+f+'\',this.value)">';
- return h+ts.map(t=>{const e=R[t.id]?R[t.id].n:0,l=L.l[t.id],r=L.r[t.id],d=l==null?null:l-e,o=l!=null&&r!=null?l-r:null;
+ return h+(E?'<div class="card s">✓ विक्रेताले पक्का गरेको लोड योजना अनुसार (Order भन्दा फरक हुन सक्छ)</div>':'')+ts.map(t=>{const e=E?(E[t.id]||0):(R[t.id]?R[t.id].n:0),l=L.l[t.id],r=L.r[t.id],d=l==null?null:l-e,o=l!=null&&r!=null?l-r:null;
   return'<div class="sum"><div class="row"><b style="font-size:17px">'+H(t.n)+'</b><span>चाहिने <b class="ok" style="font-size:20px">'+e+'</b></span></div>'+
   '<div class="row" style="margin-top:8px"><span class="s" style="flex:1">लोड गरेको (गनेर)</span>'+I(t.id,'l',l)+'<button class="b g" style="padding:8px 10px" onclick="crLd(\''+H(key)+'\',\''+t.id+'\',\'l\','+e+')">= '+e+'</button></div>'+
   (d==null?'':'<div class="'+(d?'neg':'ok')+'" style="text-align:right">'+(d==0?'✓ मिल्यो':d<0?'✗ '+(-d)+' कम लोड':'✗ '+d+' बढी लोड')+'</div>')+
@@ -6969,13 +6970,68 @@ function lV(){const s=S_(),c=C(),M=CMK(),mks=M.mkts||[],mk=s.mk!==undefined?s.mk
   (o==null?'':'<div class="'+(o?'neg':'ok')+'" style="text-align:right">'+(o==0?'✓ सबै फर्कियो':o>0?o+' बाहिरै/ग्राहकसँग':(-o)+' बढी फर्कियो')+'</div>')+'</div>'}).join('')+'<div class="s" style="margin-top:6px">लोड गर्दा गनेर लेख्नुहोस्, साँझ फर्किएका खाली गन्नुहोस्। फरक देखिए ग्राहक बाँकी ट्याबमा मिलान गर्नुहोस्।</div>'}
 window.crLd=function(key,t,f,v){const c=C(),o=(c.ld=c.ld||{})[key]=c.ld[key]||{l:{},r:{}};if(String(v).trim()==='')delete o[f][t];else o[f][t]=Math.max(0,Math.floor(+v)||0);
  try{log('क्रेट/जाली '+(f=='l'?'लोड':'फिर्ता')+' जाँच: '+key+' '+TN(t)+' '+(o[f][t]==null?'-':o[f][t]))}catch(e){}save();render()};
-function crOk(d,mk){const c=C(),R=calc(d,mk),L=(c.ld||{})[d+'|'+mk]||{l:{}};const k=Object.keys(R);return k.length&&k.every(t=>L.l[t]==R[t].n)}
-function crCard(){try{const k=roleKind(),d=S.day||TD(),c=C(),M=CMK(),st='background:var(--c);border:1px solid var(--b);border-radius:12px;padding:10px 12px;margin:8px 0;cursor:pointer';
- if(k=='field'){const t=c.types.map(x=>({n:x.n,v:M.cust.filter(z=>!z.hide).reduce((a,z)=>a+Math.max(0,bal(z.id,x.id)),0)})).filter(x=>x.v>0);
-  return'<div style="'+st+'" onclick="crGo(\'b\')"><b>'+IC('grid',16)+' ग्राहकसँग क्रेट/जाली बाँकी</b><div class="s">'+(t.length?t.map(x=>H(x.n)+' '+x.v).join(' · '):'कुनै बाँकी छैन')+' ›</div></div>'}
- const mks=(M.mkts||[]).map(m=>m.id);if(!mks.length)mks.push('');const R=calc(d),ks=Object.keys(R);if(!ks.length)return'';
- const ok=mks.filter(m=>crOk(d,m)).length,need=mks.filter(m=>Object.keys(calc(d,m)).length).length;
- return'<div style="'+st+'" onclick="crGo(\'l\')"><b>'+IC('grid',16)+' आजको क्रेट/जाली: '+ks.map(t=>H(TN(t))+' '+R[t].n).join(' · ')+'</b><div class="s">लोड जाँच '+ok+'/'+need+' बजार '+(ok==need?'✓ मिल्यो':'— जाँच गर्नुहोस्')+' ›</div></div>'}catch(e){return''}}
+function crOk(d,mk){const c=C(),R=expN(d,mk),L=(c.ld||{})[d+'|'+mk]||{l:{}},k=Object.keys(R);return k.length&&k.every(t=>L.l[t]==R[t])}
+const crNeed=(d,mk)=>{const R=mk!==undefined?expN(d,mk):(()=>{const q=calc(d),o={};Object.keys(q).forEach(t=>o[t]=q[t].n);return o})();return{R,ks:Object.keys(R),txt:Object.keys(R).map(t=>TN(t)+' '+R[t]).join(' · ')}};
+function crDsp(){try{const d=S.day||TD(),c=C();if(!Object.keys(c.map).length)return'';const mks=(CMK().mkts||[]).map(x=>x.id),sc=S.sc;const ms=sc?[sc]:mks.length?mks:[''];
+ const N=crNeed(d,sc||undefined);if(!N.ks.length)return'';const need=ms.filter(x=>Object.keys(expN(d,x)).length),ok=need.filter(x=>crOk(d,x)).length;
+ return TL(IC('grid'),'क्रेट / जाली',N.txt+' · लोड जाँच '+ok+'/'+need.length+(ok==need.length?' ✓':''),"crGo('l')")}catch(e){return''}}
+const plMk=()=>S.sc||'';
+function plan(d,mk){const c=C();c.plan=c.plan||{};const k=d+'|'+mk;return c.plan[k]=c.plan[k]||{f:{},ok:0}}
+function plRows(d,mk){const c=C(),P=plan(d,mk),o=typeof dpOrd==='function'?dpOrd(d,mk):{},ids=Object.keys(o).filter(i=>o[i]>0);Object.keys(P.f).concat(Object.keys(P.a||{})).forEach(i=>{if(!ids.includes(i))ids.push(i)});
+ return D.items.filter(i=>ids.includes(i.id)).map(i=>({i,id:i.id,o:+o[i.id]||0,pl:P.f[i.id]!=null?P.f[i.id]:(+o[i.id]||0),a:(P.a&&P.a[i.id]!=null)?P.a[i.id]:null,q:(P.a&&P.a[i.id]!=null)?P.a[i.id]:(P.f[i.id]!=null?P.f[i.id]:(+o[i.id]||0)),f:c.map[i.id]}))}
+const plQ=(d,mk)=>{const q={};plRows(d,mk).forEach(r=>{if(r.q>0)q[r.id]=r.q});return q};
+function plLoad(rows){const c=C(),res={},fill={},G={},add=(t,n)=>{if(n>0)res[t]=(res[t]||0)+n};
+ rows.forEach(r=>{const f=r.f;if(!f||!(r.q>0)||!(f.p>0))return;
+  if(f.s!=null){const B=f.g?gb(c,f.g):f,k=f.g||r.id,z=G[k]=G[k]||{f:B,q:0};z.q+=r.q*B.p/f.p}
+  else if((f.m||1)==1)add(f.t,Math.ceil(r.q/f.p-1e-9));
+  else fill[f.t]=(fill[f.t]||0)+r.q/f.p});
+ Object.keys(fill).forEach(t=>add(t,Math.ceil(fill[t]-1e-9)));
+ Object.values(G).forEach(z=>pack(z.q,z.f).forEach(([t,n])=>add(t,n)));return{res,fill}}
+function expN(d,mk){const PL=(C().plan||{})[d+'|'+mk];if(PL&&PL.ok)return plLoad(plRows(d,mk)).res;const R=calc(d,mk),o={};Object.keys(R).forEach(t=>o[t]=R[t].n);return o}
+const plSet=(id,v)=>{const P=plan(S.cr.d,plMk());P.f[id]=Math.max(0,Math.floor(+v)||0);P.ok=0;save();render()};
+window.crPf=plSet;
+window.crPd=(id,x)=>{const r=plRows(S.cr.d,plMk()).find(z=>z.id==id);plSet(id,(r?r.pl:0)+x)};
+window.crPadd=id=>{if(!id)return;plan(S.cr.d,plMk()).f[id]=0;save();render()};
+window.crPa=function(m){const d=S.cr.d,mk=plMk(),P=plan(d,mk),rows=plRows(d,mk);
+ if(m=='ok'){P.ok=Date.now();try{log('लोड योजना पक्का: '+d)}catch(e){}save();return render()}
+ if(m=='un'){P.ok=0;save();return render()}
+ if(m=='o')P.f={};else if(m=='5'||m=='10')rows.forEach(r=>{P.f[r.id]=Math.ceil(r.o*(1+m/100)-1e-9)});
+ else if(m=='full'||m=='near'||m=='down')rows.forEach(r=>{if(r.f&&r.f.s==null&&(r.f.m||1)>1&&r.pl>0){const p=r.f.p,u=Math.ceil(r.pl/p-1e-9)*p,dn=Math.floor(r.pl/p+1e-9)*p;P.f[r.id]=m=='full'?u:m=='down'?(dn>0?dn:u):((dn==0||r.pl-dn>=p/2)?u:dn)}});else if(m=='pct'){const v=parseFloat((document.getElementById('plpct')||{}).value);if(!isFinite(v))return toast('प्रतिशत लेख्नुहोस् (जस्तै 5 वा -10)');rows.forEach(r=>{P.f[r.id]=Math.max(0,Math.ceil(r.o*(1+v/100)-1e-9))})}
+ P.ok=0;save();render()};
+window.crPs=function(){const d=S.cr.d,rows=plRows(d,plMk()),L=plLoad(rows);let t='लोड सूची — '+d+'\n';rows.forEach(r=>{if(r.q>0)t+=(r.i.name||'')+': '+r.q+(r.q!=r.o?' (Order '+r.o+')':'')+'\n'});t+='\n'+Object.keys(L.res).map(x=>TN(x)+' '+L.res[x]).join(' · ');shareTxt(t)};
+function pRow(r){const f=r.f,dl=r.q-r.o,id=r.id;let h='<div class="pl-i"><div class="pl-r"><div>'+inm(r.i)+'<div class="pl-o">Order '+r.o+' <span class="pl-dl '+(dl?(dl>0?'up':'dn'):'')+'">'+(dl?(dl>0?'+'+dl+' बढी':(-dl)+' कम'):'Order जति')+'</span></div></div>'+
+ '<div class="pl-st"><button aria-label="घटाउनुहोस्" onclick="crPd(\''+id+'\',-1)">−</button><input inputmode="numeric" value="'+r.q+'" onchange="crPf(\''+id+'\',this.value)"><button aria-label="बढाउनुहोस्" onclick="crPd(\''+id+'\',1)">+</button></div></div>';
+ if(f&&f.p>0){const fu=Math.floor(r.q/f.p),re=r.q-fu*f.p,up=(fu+1)*f.p,dn=fu*f.p;
+  h+='<div class="pl-bar'+(re?' pt':'')+'"><i style="width:'+(r.q?(re?re/f.p*100:100):0)+'%"></i></div><div class="pl-ch"><span>'+H(TN(f.t))+': '+fu+' फुल'+(re?' + '+re+'/'+f.p:'')+'</span>'+(re?'<button onclick="crPf(\''+id+'\','+up+')">↑ '+up+' फुल</button>'+(fu?'<button onclick="crPf(\''+id+'\','+dn+')">↓ '+dn+'</button>':''):'')+(f.s==null&&(f.m||1)>1?'<button onclick="crPd(\''+id+'\','+(-f.p)+')">−१ क्रेट</button><button onclick="crPd(\''+id+'\','+f.p+')">+१ क्रेट</button>':'')+'</div>'}
+ return h+'</div>'}
+function pV(){const s=S_(),d=s.d,mk=plMk(),P=plan(d,mk),rows=plRows(d,mk),have=rows.map(r=>r.id),M=CMK(),mo={},cs=new Set();
+ M.cust.forEach(c=>mo[c.id]=c.mk||'');M.ent.forEach(e=>{if(e.date!=d||e.void||(mk&&mo[e.cid]!==mk))return;if((e.lines||[]).some(l=>+l.q>0))cs.add(e.cid)});
+ const so=rows.reduce((a,r)=>a+r.o,0),sp=rows.reduce((a,r)=>a+r.pl,0),sq=rows.reduce((a,r)=>a+r.q,0),hasA=rows.some(r=>r.a!=null),
+ LP=plLoad(rows.map(r=>Object.assign({},r,{q:r.pl}))),LA=plLoad(rows),
+ cr=(L)=>Object.keys(L.res).map(t=>'<div class="pl-k pl-c"><span>'+H(TN(t))+'</span><b>'+L.res[t]+'</b></div>').join(''),
+ rowH=r=>{const f=r.f,ad=r.pl-r.o,id=r.id;let cc='<span class="s">—</span>',fx='';
+  if(f&&f.p>0){const one=plLoad([Object.assign({},r,{q:r.pl})]).res,tx=Object.keys(one).map(t=>one[t]+' '+H(TN(t))).join(' + ');
+   if(f.s==null&&(f.m||1)>1){const rem=r.pl%f.p,fu=Math.floor(r.pl/f.p);
+    cc=rem==0&&r.pl>0?'<span class="ok">✓ '+fu+' फुल</span>':r.pl==0?'<span class="s">—</span>':'<span class="neg">'+fu+' + '+rem+'/'+f.p+'</span><div class="s">'+(f.p-rem)+' कम</div>';
+    if(rem)fx='<button class="pl-fx" onclick="crPfit(\''+id+'\')">→ '+(fu+1)*f.p+'</button>'}
+   else cc='<b>'+(tx||'—')+'</b>'}
+  return'<tr><td><b>'+inm(r.i)+'</b></td><td><b>'+r.o+'</b></td><td><input inputmode="numeric" value="'+(ad?(ad>0?'+':'')+ad:'')+'" placeholder="0" onchange="crPadj(\''+id+'\',this.value)"></td><td><b>'+r.pl+'</b></td><td>'+cc+(fx?'<div>'+fx+'</div>':'')+'</td><td><input inputmode="numeric" value="'+(r.a!=null?r.a:'')+'" placeholder="'+r.pl+'" onchange="crPact(\''+id+'\',this.value)"></td></tr>'};
+ let h='<input type="date" value="'+H(d)+'" onchange="S.cr.d=this.value;render()" style="margin:4px 0">'+
+ '<div class="pl-h"><div class="pl-k"><span>सबै Order जम्मा</span><b>'+so+'</b><i>'+cs.size+' Customer</i></div><div class="pl-k"><span>लोड योजना</span><b>'+sp+'</b><i class="'+(sp-so?(sp>so?'up':'dn'):'')+'">'+(sp-so?(sp>so?'+':'')+(sp-so):'Order बराबर')+'</i></div>'+(hasA?'<div class="pl-k"><span>एक्चुअल लोड</span><b>'+sq+'</b><i class="'+(sq-sp?(sq>sp?'up':'dn'):'')+'">'+(sq-sp?(sq>sp?'+':'')+(sq-sp)+' योजनाभन्दा':'योजना बराबर')+'</i></div>':'')+'</div>'+
+ '<div class="pl-a">'+[['o','Order अनुसार'],['5','+५%'],['10','+१०%'],['full','↑ सबै फुल क्रेट'],['near','≈ नजिकको क्रेट'],['down','↓ तल्लो क्रेट']].map(x=>'<button class="b g" style="padding:8px 12px" onclick="crPa(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'<span class="pl-pc"><input id="plpct" inputmode="decimal" placeholder="±%" aria-label="प्रतिशत"><button class="b g" style="padding:8px 12px" onclick="crPa(\'pct\')">लगाउ</button></span></div>'+
+ (rows.length?'<div class="pl-w"><table class="pl-t"><thead><tr><th>वस्तु</th><th>Order जम्मा</th><th>थप / घट</th><th>लोड</th><th>क्रेट / जाली</th><th>एक्चुअल</th></tr></thead><tbody>'+rows.map(rowH).join('')+'</tbody><tfoot><tr><td>जम्मा</td><td>'+so+'</td><td>'+(sp-so>0?'+':'')+(sp-so)+'</td><td>'+sp+'</td><td></td><td>'+(hasA?sq:'')+'</td></tr></tfoot></table></div>':'<div class="card s" style="text-align:center;padding:18px">यो मितिको Order छैन। तल वस्तु थपेर पनि लोड बनाउन सकिन्छ।</div>')+
+ '<div class="sec" style="--dot:hsl(150 60% 45%)">क्रेट / जाली — आफैं गणना</div><div class="pl-h">'+(cr(LP)||'<div class="s">—</div>')+'</div>'+
+ (hasA?'<div class="s" style="margin:-4px 0 4px">एक्चुअल लोडअनुसार:</div><div class="pl-h">'+(cr(LA)||'<div class="s">—</div>')+'</div>':'')+
+ '<select style="width:100%;padding:11px;margin:4px 0 10px" onchange="crPadd(this.value)"><option value="">+ Order नभएको वस्तु थप्नुहोस्</option>'+D.items.filter(i=>!i.hide&&!have.includes(i.id)).map(i=>'<option value="'+i.id+'">'+H(i.name)+'</option>').join('')+'</select>';
+ return h+(P.ok?'<div class="card" style="border-color:hsl(150 60% 45%)"><b>✓ योजना पक्का भयो</b><div class="s">'+new Date(P.ok).toLocaleTimeString('ne-NP',{hour:'2-digit',minute:'2-digit'})+' · Dispatch ले यही (एक्चुअल भए एक्चुअल) अनुसार क्रेट/जाली जाँच्छ।</div><div class="row" style="gap:6px;margin-top:8px"><button class="b g" style="flex:1" onclick="crPs()">सूची पठाउनुहोस्</button><button class="b g" style="flex:1" onclick="crPa(\'un\')">सम्पादन</button></div></div>':
+  '<div class="row" style="gap:6px"><button class="b" style="flex:2;padding:13px" onclick="crPa(\'ok\')">✓ योजना पक्का गर्नुहोस्</button><button class="b g" style="flex:1" onclick="crPs()">पठाउनुहोस्</button></div>')+
+  '<div class="s" style="margin-top:6px">थप / घटमा Order भन्दा कति बढी (+) वा कम (−) लैजाने लेख्नुहोस्। गल्ती भएर वास्तवमा अर्कै लोड गरिएको भए "एक्चुअल" मा लेख्नुहोस् — क्रेट गणना त्यसैअनुसार बदलिन्छ।</div>'}
+window.crPadj=(id,v)=>{const r=plRows(S.cr.d,plMk()).find(z=>z.id==id),n=parseFloat(String(v).replace('+',''));plSet(id,(r?r.o:0)+(isFinite(n)?Math.floor(n):0))};
+window.crPact=(id,v)=>{const P=plan(S.cr.d,plMk());P.a=P.a||{};if(String(v).trim()==='')delete P.a[id];else P.a[id]=Math.max(0,Math.floor(+v)||0);P.ok=0;save();render()};
+window.crPfit=id=>{const r=plRows(S.cr.d,plMk()).find(z=>z.id==id);if(r&&r.f&&r.f.p>0)plSet(id,Math.ceil(r.pl/r.f.p-1e-9)*r.f.p)};
+function crPlanCard(){try{const d=S.day||TD(),mk=plMk(),rows=plRows(d,mk),P=plan(d,mk),L=plLoad(rows),so=rows.reduce((a,r)=>a+r.o,0),sq=rows.reduce((a,r)=>a+r.q,0),dl=sq-so,t=Object.keys(L.res).map(x=>TN(x)+' '+L.res[x]).join(' · ');
+ return'<div class="sec" style="--dot:#e65100">आजको लोड</div><div class="card stl" style="--h:150;align-items:stretch" role="button" tabindex="0" onclick="crGo(\'p\')"><span class="sti">'+IC('grid')+'</span><div class="stx"><b>लोड योजना · बजारमा कति लैजाने</b><div class="s">'+(rows.length?'Order '+so+' → लोड <b>'+sq+'</b>'+(dl?' <span class="'+(dl>0?'ok':'neg')+'">('+(dl>0?'+':'')+dl+')</span>':''):'Order छैन — आफैं थपेर लोड बनाउन सकिन्छ')+'</div>'+(t?'<div class="s">'+t+'</div>':'')+'<div class="s" style="font-weight:700;color:'+(P.ok?'var(--a)':'#e65100')+'">'+(P.ok?'✓ पक्का भयो':'योजना पक्का गर्न बाँकी')+'</div></div><span class="s">›</span></div>'}catch(e){return''}}
+(()=>{const st=document.createElement('style');st.textContent='.pl-h{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin:10px 0}.pl-k{border:1px solid var(--b);border-radius:14px;padding:10px;background:var(--c);display:flex;flex-direction:column;gap:2px}.pl-k span{font-size:12px;opacity:.7}.pl-k b{font-size:24px;line-height:1.1}.pl-k i{font-size:11px;font-style:normal;opacity:.8}.pl-k i.up{color:#2e7d32}.pl-k i.dn{color:#c62828}.pl-c{background:color-mix(in srgb,hsl(150 60% 45%) 12%,var(--c));border-color:color-mix(in srgb,hsl(150 60% 45%) 40%,var(--b))}.pl-a{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px}.pl-a button{white-space:nowrap}.pl-i{border:1px solid var(--b);border-radius:14px;background:var(--c);padding:10px 12px;margin-bottom:8px}.pl-r{display:flex;align-items:center;gap:8px}.pl-r>div:first-child{flex:1;min-width:0}.pl-o{font-size:12px;opacity:.85;margin-top:2px}.pl-st{display:flex;align-items:center;gap:4px}.pl-st button{width:38px;height:38px;border-radius:10px;border:1px solid var(--b);background:var(--c);font-size:20px;color:inherit;cursor:pointer}.pl-st input{width:58px;height:38px;text-align:center;font-weight:700;font-size:17px}.pl-bar{height:6px;border-radius:4px;background:var(--b);margin-top:8px;overflow:hidden}.pl-bar i{display:block;height:100%;background:hsl(150 60% 45%)}.pl-bar.pt i{background:hsl(35 90% 50%)}.pl-ch{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center;font-size:12px}.pl-ch span{flex:1;opacity:.85}.pl-ch button{padding:4px 10px;border-radius:99px;border:1px solid var(--b);background:transparent;color:inherit;font-size:12px;cursor:pointer}.pl-dl{font-size:11px;padding:1px 7px;border-radius:99px;margin-left:4px}.pl-dl.up{background:#e8f5e9;color:#2e7d32}.pl-dl.dn{background:#ffebee;color:#c62828}';document.head.appendChild(st)})();
 window.crGo=function(tab){S.cr=S_();S.cr.tab=tab;S.cr.d=S.day||TD();S.sub='crate';S.hub=null;render();window.scrollTo(0,0)};
 const IC=(n,z)=>typeof icn==='function'?icn(n,z):'';
 const subN=()=>{try{const R=calc(S.day||TD()),n=Object.values(R).reduce((z,r)=>z+r.n,0);return n?'आज '+n+' क्रेट / जाली / ड्रम':'आज चाहिने छैन'}catch(e){return''}},
@@ -6985,12 +7041,19 @@ const TL=(ic,t,su,act)=>'<div class="card stl" style="--h:150" role="button" tab
 function crCust(){try{const cid=S.cid,c=C();if(!cid)return'';const bt=(t,k,l)=>'<button class="b g" style="padding:6px 10px" onclick="crMv(\''+cid+'\',\''+t+'\',\''+k+'\')">'+l+'</button>';
  return'<div class="card"><b>'+IC('grid',16)+' क्रेट / जाली / ड्रम</b>'+c.types.map(t=>{const v=bal(cid,t.id);return'<div class="row" style="margin-top:6px"><span class="s" style="flex:1">'+H(t.n)+': <b class="'+(v>0?'neg':'ok')+'">'+v+'</b></span>'+bt(t.id,'out','+ दिएँ')+bt(t.id,'in','− फिर्ता')+'</div>'}).join('')+'</div>'}catch(e){return''}}
 const ow=(n,fn)=>{const f=window[n];if(typeof f==='function')window[n]=function(){return fn(f.apply(this,arguments))}};
+/* Report › दिनको सारांश (बिक्री र असुली · Delivery प्रगति · Report पठाउनुहोस्) Dashboard र अन्य पेजमा पहिल्यै छ — दोहोरो हटाइयो */
+ow('rpSecs2',r=>Array.isArray(r)?r.filter(x=>x.k!=='sum'):r);
 ow('ledV',h=>{const c=crCust();if(!c)return h;const i=h.indexOf('<div class="card lrow');return i<0?h+c:h.slice(0,i)+c+h.slice(i)});
-ow('repV',h=>S.sub?h:h+'<div class="sec">क्रेट / जाली</div>'+TL(IC('grid'),'क्रेट / जाली गणना',subN(),"crGo('c')")+TL(IC('repeat'),'क्रेट / जाली बाँकी',subB(),"crGo('b')"));
+ow('repV',h=>{if(S.sub)return h;const t=TL(IC('repeat'),'क्रेट / जाली बाँकी',subB(),"crGo('b')"),k=h.indexOf('<div class="sec">Customer र Cash</div>');if(k<0)return h+'<div class="sec">क्रेट / जाली</div>'+t;let e=h.indexOf('<div class="sec"',k+10);return e<0?h+t:h.slice(0,e)+t+h.slice(e)});
+ow('sellerV',h=>{const c=crPlanCard();if(!c)return h;let k=h.indexOf('<div class="card"><div class="chd"><b>दैनिक कार्यप्रवाह</b>');if(k<0)k=h.indexOf('<div class="sec" style="--dot:#2e7d32">दिनको हिसाब</div>');return k<0?h+c:h.slice(0,k)+c+h.slice(k)});
+{const f=window.dspPageV;if(typeof f==='function')window.dspPageV=function(){try{const d=S.day||(S.day=today());return dspHero(d)+bar()+dspAttV(d)+dspKpiV(d)+dayRail(d)+stkBtn()+crDsp()+dspV(d,dspEd(d))}catch(e){return f.apply(this,arguments)}}}
 const po=window.pageV;if(typeof po==='function')window.pageV=function(){return S.sub==='crate'&&S.cr?crV():po.apply(this,arguments)};
-['adminV','sellerV','dspPageV'].forEach(n=>{const f=window[n];if(typeof f==='function')window[n]=function(){return crCard()+f.apply(this,arguments)}});
-window.crV=function(){const s=S_();return'<div class="c2h"><button class="b g" style="padding:6px 12px" aria-label="पछाडि" onclick="S.sub=null;S.cr=null;render()">←</button><h2>क्रेट / जाली हिसाब</h2></div>'+tabs()+(s.tab=='b'?bV():s.tab=='l'?lV():s.tab=='s'&&roleKind()=='mgmt'?sV():cV())};
+window.crV=function(){const s=S_();return'<div class="c2h"><button class="b g" style="padding:6px 12px" aria-label="पछाडि" onclick="S.sub=null;S.cr=null;render()">←</button><h2>क्रेट / जाली हिसाब</h2></div>'+tabs()+(s.tab=='b'?bV():s.tab=='p'&&roleKind()=='field'?pV():s.tab=='l'?lV():s.tab=='s'&&roleKind()=='mgmt'?sV():cV())};
 const o=window.setV;window.setV=function(){if(S.sub==='crate')return crV();const h=o.apply(this,arguments);if(S.sub||roleKind()!='mgmt')return h;const t=TL(IC('sliders'),'क्रेट / जाली नियम',subS(),"crGo('s')"),k=h.indexOf('वस्तु र Rate');if(k<0)return t+h;let e=h.indexOf('<div class="card stl"',k);const e2=h.indexOf('<div class="sec"',k);if(e<0||(e2>=0&&e2<e))e=e2;return e<0?h+t:h.slice(0,e)+t+h.slice(e)};
 })();
 </script>
+<style>.pl-pc{display:inline-flex;gap:4px;align-items:center}.pl-pc input{width:68px;padding:7px;text-align:center;border:1px solid var(--b);border-radius:10px;background:var(--c);color:var(--t)}.pl-ch{row-gap:6px}</style>
+<style>.pl-w{overflow-x:auto;border:1px solid var(--b);border-radius:12px;background:var(--c);margin:6px 0}.pl-t{width:100%;border-collapse:collapse;font-size:14px}.pl-t th,.pl-t td{padding:8px 6px;border-bottom:1px solid var(--b);text-align:center;white-space:nowrap}.pl-t th{font-size:12px;color:var(--m);font-weight:600}.pl-t td:first-child,.pl-t th:first-child{text-align:left;position:sticky;left:0;background:var(--c);white-space:normal;min-width:110px;max-width:150px}.pl-t input{width:56px;height:36px;text-align:center;font-weight:700;border:1px solid var(--b);border-radius:8px;background:var(--c);color:var(--t)}.pl-t tfoot td{font-weight:700;background:color-mix(in srgb,var(--a) 8%,var(--c));border-bottom:0}.pl-fx{border:1px solid var(--b);border-radius:99px;background:transparent;color:inherit;padding:3px 9px;font-size:12px;margin-top:3px}</style>
+
+
 </body></html>
